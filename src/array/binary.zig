@@ -1,9 +1,11 @@
 //! Arrow Arrays
 const std = @import("std");
 const Io = std.Io;
+const utils = @import("utils.zig");
 
 //TODO: implement retrieve value function
-const String = struct {
+//TODO: Do i need offset to have first element 0? Isn't it just implied?
+const Binary = struct {
     length: usize,
     nulls: usize,
     offset: []u32,
@@ -11,20 +13,11 @@ const String = struct {
 
     const Self = @This();
 
-    fn calc_cap(bytes: usize) usize {
-        var capacity: usize = 64;
-        while (capacity < bytes) {
-            capacity *= 2;
-        }
-        return capacity;
-    }
-
-    
-    //TODO: increase size to u64 in case of extra long string
+    //TODO: contigency to increase size to u64 in case of extra long string?
     ///Init from a slice of slices
     ///Assumption: length of total char < u32
-    pub fn init(alloc: std.mem.Allocator, source: []const ?[]const u8) !String {
-        const offset_cap = calc_cap(2*(source.len+1));
+    pub fn init(alloc: std.mem.Allocator, source: []const ?[]const u8) !Self {
+        const offset_cap = utils.calc_cap(2*(source.len+1));
         const offset: []u32 = try alloc.alloc(u32, offset_cap/2);
         offset[0] = 0;
 
@@ -41,7 +34,7 @@ const String = struct {
             offset[i] = len;
         }
 
-        const target_len: usize = calc_cap(len);
+        const target_len: usize = utils.calc_cap(len);
         const target: []u8 = try alloc.alloc(u8, target_len);
 
         for (source, 0..) |str, i| {
@@ -51,7 +44,7 @@ const String = struct {
             @memcpy(target[start..end], s);
         }
 
-        return .{
+        return Self {
             .length = source.len,
             .nulls = nulls,
             .offset = offset,
@@ -65,13 +58,13 @@ const String = struct {
 
 };
 
-test "string" {
+test "binary" {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
     const source: []const ?[]const u8 = &[_]?[]const u8{"Hello", "world", "testing", null, "dog", "cat"};
-    const array = try String.init(alloc, source);
+    const array = try Binary.init(alloc, source);
     defer alloc.free(array.values);
     defer alloc.free(array.offset);
 
@@ -83,9 +76,5 @@ test "string" {
     const item5_start = array.offset[5];
     const item5_end = array.offset[6];
     try std.testing.expect(std.mem.eql(u8, array.values[item5_start..item5_end], "cat"));
-
-    // try std.testing.expect(std.mem.eql(u8,
-    //         array.values[item5_start..item5_end],
-    //         "dog"));
 }
 

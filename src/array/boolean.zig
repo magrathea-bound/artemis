@@ -1,5 +1,5 @@
 const std = @import("std");
-
+const utils = @import("utils.zig");
 
 const Bool = struct {
     length: usize,
@@ -10,14 +10,6 @@ const Bool = struct {
 
     const Self = @This();
 
-    fn calc_cap(bytes: usize) usize {
-        var capacity: usize = 8;
-        while (capacity < bytes) {
-            capacity *= 2;
-        }
-        return capacity;
-    }
-
     pub fn init(alloc: std.mem.Allocator, source: []const ?bool) !Self {
         //TODO: Potentially subtract nulls from length of buf since they aren't included
         //Thoughts: Works well if i don't skip nulls in target, otherwise
@@ -26,7 +18,7 @@ const Bool = struct {
         //separately
         //length needs to be including nulls though...
         const bytes_req = (source.len + 7) / 8;
-        const buf_cap = calc_cap(bytes_req);
+        const buf_cap = utils.calc_cap(bytes_req);
 
         var target: []u8 = try alloc.alloc(u8, buf_cap);
         @memset(target, 0);
