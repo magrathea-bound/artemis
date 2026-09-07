@@ -1,7 +1,7 @@
 //! Arrow Arrays
 const std = @import("std");
 const Io = std.Io;
-
+const u = @import("utils.zig");
 
 //TODO: Add null array (Or debate if leaving values as null is better)
 //TODO: Add 128 byte buffers, only needed for i and f?
@@ -19,15 +19,6 @@ pub fn FixedBuffer(comptime T: type) type {
 
         const Self = @This();
 
-        ///Loops to find the 64 byte alignment size for a fixed buffer
-        fn calc_cap(bytes: usize) usize {
-            var capacity: usize = 8;
-            while (capacity < bytes) {
-                capacity *= 2;
-            }
-            return capacity;
-        }
-
         ///Count the nulls within the slice
         ///This will likely be replaced when null array is implemented
         fn count_nulls(buffer: []const T) usize {
@@ -42,7 +33,7 @@ pub fn FixedBuffer(comptime T: type) type {
 
         pub fn init(alloc: std.mem.Allocator, source: []const T) !Self {
             const data_bytes = @sizeOf(T) * source.len;
-            const target_cap = Self.calc_cap(data_bytes);
+            const target_cap = u.calc_cap(data_bytes);
             const allocated_elements = target_cap / @sizeOf(T);
             const dest: []T = try alloc.alloc(T, allocated_elements);   
 
