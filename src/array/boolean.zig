@@ -1,31 +1,16 @@
 const std = @import("std");
-const utils = @import("utils.zig");
+const u = @import("utils.zig");
 
 const Bool = struct {
     length: usize,
     nulls: usize,
-    null_buffer: []u8,
     values: []u8,
+    null_bitmap: []u8,
     alloc: std.mem.Allocator,
 
     const Self = @This();
 
-    pub fn init(alloc: std.mem.Allocator, source: []const ?bool) !Self {
-        //TODO: Potentially subtract nulls from length of buf since they aren't included
-        //Thoughts: Works well if i don't skip nulls in target, otherwise
-        //it might be better to just separate these two completely...
-        //this gets squirrely, how do i handle length?  I think they need to be dealt with 
-        //separately
-        //length needs to be including nulls though...
-        const bytes_req = (source.len + 7) / 8;
-        const buf_cap = utils.calc_cap(bytes_req);
-
-        var target: []u8 = try alloc.alloc(u8, buf_cap);
-        @memset(target, 0);
-        var null_buff: []u8 = try alloc.alloc(u8, buf_cap);
-        @memset(null_buff, 0);
-        
-        var nulls: usize = 0;
+    fn load(source: []const ?bool, b: *Bool) void {
         for (source, 0..) |val, i| {
             const elem = i / 8;
             const bit: u3 = @intCast(i % 8);
@@ -33,31 +18,43 @@ const Bool = struct {
             if (val) |v| {
                 switch (v) {
                     true => {
-                        target[elem] |= @as(u8, 1) << bit;
+                        b.values[elem] |= @as(u8, 1) << bit;
                     },
                     else => continue,
                 }
             } else {
-                null_buff[elem] |= @as(u8, 1) << bit;
-                nulls += 1;
+                b.null_bitmap[elem] |= @as(u8, 1) << bit;
+                b.nulls += 1;
             }
         }
-        
-        return Self {
-            .length = source.len,
-            .nulls = nulls,
-            .null_buffer = null_buff,
-            .values = target,
+        b.length += source.len;
+    }
+
+    pub fn init(alloc: std.mem.Allocator, source: []const ?bool) !Self {
+        var b = Self{
+            .length = 0,
+            .nulls = 0,
+            .values = undefined,
+            .null_bitmap = undefined,
             .alloc = alloc,
         };
-    }
 
+        const bytes_req = (source.len + 7) / 8;
+        const buf_cap = u.calc_cap(bytes_req);
+        b.values = try alloc.alloc(u8, buf_cap);
+        @memset(b.values, 0);
+        b.null_bitmap = try alloc.alloc(u8, buf_cap);
+        @memset(b.null_bitmap, 0);
+
+        load(source, &b);
+
+        return b;
+        }
+        
     pub fn deinit(self: Self) void {
         self.alloc.free(self.values);
-        self.alloc.free(self.null_buffer);
+        self.alloc.free(self.null_bitmap);
     }
-
-
 
 };
 
@@ -73,9 +70,9 @@ test "boolean" {
 
     try std.testing.expect(array.length == 5);
     try std.testing.expect(array.nulls == 1);
-    try std.testing.expect(array.null_buffer.len == 8);
-    try std.testing.expect(array.null_buffer[0] == 0b0000_0100);
-    try std.testing.expect(array.values.len == 8);
+    try std.testing.expect(array.null_bitmap.len == 64);
+    try std.testing.expect(array.null_bitmap[0] == 0b0000_0100);
+    try std.testing.expect(array.values.len == 64);
     try std.testing.expect(array.values[0] == 0b0001_0001);
 }
 

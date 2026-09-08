@@ -8,53 +8,59 @@ const utils = @import("utils.zig");
 const Binary = struct {
     length: usize,
     nulls: usize,
-    offset: []u32,
     values: []u8,
+    offset: []u32,
 
     const Self = @This();
 
-    //TODO: contigency to increase size to u64 in case of extra long string?
-    ///Init from a slice of slices
-    ///Assumption: length of total char < u32
-    pub fn init(alloc: std.mem.Allocator, source: []const ?[]const u8) !Self {
-        const offset_cap = utils.calc_cap(2*(source.len+1));
-        const offset: []u32 = try alloc.alloc(u32, offset_cap/2);
-        offset[0] = 0;
-
-        var nulls: usize = 0;
-        var len: u32 = 0;
-        for (source, 1..) |str, i| {
+    fn load_offset(source: []const ?[]const u8, b: *Self) u32 {
+        var len: u32 = b.offset[b.length];
+        for (source, b.length..) |str, i| {
             const s = str orelse {
-                nulls += 1;
-                offset[i] = len;
+                b.nulls += 1;
+                b.offset[i+1] = b.offset[i];
                 continue;
             };
 
             len += @intCast(s.len);
-            offset[i] = len;
+            b.offset[i+1] = len;
         }
-
-        const target_len: usize = utils.calc_cap(len);
-        const target: []u8 = try alloc.alloc(u8, target_len);
-
-        for (source, 0..) |str, i| {
-            const s = str orelse continue;
-            const start: u32 = offset[i];
-            const end: u32 = offset[i+1];
-            @memcpy(target[start..end], s);
-        }
-
-        return Self {
-            .length = source.len,
-            .nulls = nulls,
-            .offset = offset,
-            .values = target,
-        };
-
-
-
+        return len;
     }
 
+    fn load_values(source: []const ?[]const u8, b: *Self) void {
+        for (source, b.length..) |str, i| {
+            const s = str orelse continue;
+            const start: u32 = b.offset[i];
+            const end: u32 = b.offset[i+1];
+            @memcpy(b.values[start..end], s);
+        }
+        b.length = source.len;
+    }
+
+    //TODO: contigency to increase size to u64 in case of extra long string?
+    //This would likely be implemented on the abstraction level
+    ///Init from a slice of slices
+    ///Assumption: length of total char < u32
+    pub fn init(alloc: std.mem.Allocator, source: []const ?[]const u8) !Self {
+        var b = Self{
+            .length = 0,
+            .nulls = 0,
+            .values = undefined,
+            .offset = undefined,
+        };
+        const offset_cap = utils.calc_cap(2*(source.len+1));
+        b.offset = try alloc.alloc(u32, offset_cap/2);
+        b.offset[0] = 0;
+
+        const offset_len = load_offset(source, &b);
+
+        const target_len: usize = utils.calc_cap(offset_len);
+        b.values = try alloc.alloc(u8, target_len);
+        load_values(source, &b);
+
+        return b;
+    }
 
 };
 
