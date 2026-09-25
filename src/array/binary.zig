@@ -3,8 +3,6 @@ const std = @import("std");
 const Io = std.Io;
 const utils = @import("utils.zig");
 
-//TODO: implement retrieve value function
-//TODO: Do i need offset to have first element 0? Isn't it just implied?
 const Binary = struct {
     length: usize,
     nulls: usize,
@@ -38,10 +36,6 @@ const Binary = struct {
         b.length = source.len;
     }
 
-    //TODO: contigency to increase size to u64 in case of extra long string?
-    //This would likely be implemented on the abstraction level
-    ///Init from a slice of slices
-    ///Assumption: length of total char < u32
     pub fn init(alloc: std.mem.Allocator, source: []const ?[]const u8) !Self {
         var b = Self{
             .length = 0,

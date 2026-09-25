@@ -3,12 +3,6 @@ const std = @import("std");
 const Io = std.Io;
 const u = @import("utils.zig");
 
-//TODO: Add null array (Or debate if leaving values as null is better)
-//TODO: Add 128 byte buffers, only needed for i and f?
-//TODO: Append function
-//TODO: Remove function
-//TODO: Stream function?
-//TODO: Add non null primitives; @typeInfo(T) == .optional;
 ///Comptime function to define Fixed buffer types
 pub fn FixedBuffer(comptime T: type) type {
     return struct {

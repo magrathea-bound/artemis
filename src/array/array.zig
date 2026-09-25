@@ -12,9 +12,9 @@ const Float64 = @import("primitives.zig").Float64;
 const Bool = @import("boolean.zig").Bool;
 const Binary = @import("binary.zig").Binary;
 
-
 test {
     _ = @import("primitives.zig");
-    _ = @import("binary.zig");
     _ = @import("boolean.zig");
+    _ = @import("binary.zig");
+    _ = @import("binaryView.zig");
 }
