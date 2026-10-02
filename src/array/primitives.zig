@@ -15,7 +15,7 @@ pub fn FixedBuffer(comptime T: type) type {
         length: usize,
         nulls: usize, 
         values: []T,
-        null_bitmap: []u8,
+        null_bitmap: u.Bitmap,
         alloc: std.mem.Allocator,
 
         const Self = @This();
@@ -26,9 +26,7 @@ pub fn FixedBuffer(comptime T: type) type {
                     fb.values[i] = val;
                 } else {
                     fb.values[i] = 0;
-                    const elem = i / 8;
-                    const bit = i % 8;
-                    fb.null_bitmap[elem] |= @as(u8, 1) << @intCast(bit);
+                    fb.null_bitmap.load_value(i);
                     fb.nulls += 1;
                 }
             }
@@ -48,18 +46,16 @@ pub fn FixedBuffer(comptime T: type) type {
             const allocated_elements = target_cap / @sizeOf(T);
             fb.values = try alloc.alloc(T, allocated_elements);   
 
-            const null_bytes = (source.len + 7) / 8;
-            const null_cap = u.calc_cap(null_bytes);
-            fb.null_bitmap = try alloc.alloc(u8, null_cap);
+            fb.null_bitmap = try u.Bitmap.init(alloc, source.len);
 
             load(source, &fb);
 
             return fb;
         }
 
-        pub fn deinit(self: @This()) void {
+        pub fn deinit(self: *Self) void {
             self.alloc.free(self.values);
-            self.alloc.free(self.null_bitmap);
+            self.alloc.free(self.null_bitmap.values);
         }
 
     };
@@ -84,7 +80,7 @@ test "unsigned fixedbuffer" {
     const alloc = gpa.allocator();
 
     const source: []const ?u8 = &[_]?u8{1, 2, null, 42, 8};
-    const array = try UInt8.init(alloc, source);
+    var array = try UInt8.init(alloc, source);
     defer array.deinit();
 
     try std.testing.expect(array.length == 5);
@@ -100,7 +96,7 @@ test "signed fixedbuffer" {
     const alloc = gpa.allocator();
 
     const source: []const ?i16 = &[_]?i16{1, 2, null, 42, 8};
-    const array = try Int16.init(alloc, source);
+    var array = try Int16.init(alloc, source);
     defer array.deinit();
 
     try std.testing.expect(array.length == 5);
@@ -116,7 +112,7 @@ test "float fixedbuffer" {
     const alloc = gpa.allocator();
 
     const source: []const ?f32 = &[_]?f32{1.0, 3.14, null, 42.8, 8.92};
-    const array = try Float32.init(alloc, source);
+    var array = try Float32.init(alloc, source);
     defer array.deinit();
 
     try std.testing.expect(array.length == 5);
