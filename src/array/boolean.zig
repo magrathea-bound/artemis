@@ -4,26 +4,25 @@ const u = @import("utils.zig");
 const Bool = struct {
     length: usize,
     nulls: usize,
-    values: []u8,
-    null_bitmap: []u8,
+    values: u.Bitmap,
+    null_bitmap: u.Bitmap,
     alloc: std.mem.Allocator,
 
     const Self = @This();
 
     fn load(source: []const ?bool, b: *Bool) void {
         for (source, 0..) |val, i| {
-            const elem = i / 8;
-            const bit: u3 = @intCast(i % 8);
-
             if (val) |v| {
+                //Handle Value
                 switch (v) {
                     true => {
-                        b.values[elem] |= @as(u8, 1) << bit;
+                        b.values.load_value(i);
                     },
                     else => continue,
                 }
+            //Handle Null
             } else {
-                b.null_bitmap[elem] |= @as(u8, 1) << bit;
+                b.null_bitmap.load_value(i);
                 b.nulls += 1;
             }
         }
@@ -39,12 +38,8 @@ const Bool = struct {
             .alloc = alloc,
         };
 
-        const bytes_req = (source.len + 7) / 8;
-        const buf_cap = u.calc_cap(bytes_req);
-        b.values = try alloc.alloc(u8, buf_cap);
-        @memset(b.values, 0);
-        b.null_bitmap = try alloc.alloc(u8, buf_cap);
-        @memset(b.null_bitmap, 0);
+        b.values = try u.Bitmap.init(alloc, source.len);
+        b.null_bitmap = try u.Bitmap.init(alloc, source.len);
 
         load(source, &b);
 
@@ -52,8 +47,8 @@ const Bool = struct {
         }
         
     pub fn deinit(self: Self) void {
-        self.alloc.free(self.values);
-        self.alloc.free(self.null_bitmap);
+        self.alloc.free(self.values.values);
+        self.alloc.free(self.null_bitmap.values);
     }
 
 };
@@ -65,14 +60,17 @@ test "boolean" {
     const alloc = gpa.allocator();
 
     const source: []const ?bool = &[_]?bool{true, false, null, false, true};
-    const array = try Bool.init(alloc, source);
+    var array = try Bool.init(alloc, source);
     defer array.deinit();
 
+    //Object allocated properly
     try std.testing.expect(array.length == 5);
     try std.testing.expect(array.nulls == 1);
-    try std.testing.expect(array.null_bitmap.len == 64);
-    try std.testing.expect(array.null_bitmap[0] == 0b0000_0100);
-    try std.testing.expect(array.values.len == 64);
-    try std.testing.expect(array.values[0] == 0b0001_0001);
+    //Values match
+    try std.testing.expect(array.values.retrieve_val(0));
+    try std.testing.expect(!array.values.retrieve_val(1));
+    //Nulls Match
+    try std.testing.expect(array.null_bitmap.retrieve_val(2));
+    try std.testing.expect(!array.null_bitmap.retrieve_val(0));
 }
 
