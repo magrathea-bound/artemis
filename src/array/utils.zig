@@ -20,7 +20,6 @@ pub const Bitmap = struct {
         const slice = self.values[i];
         const on: bool = (slice & (@as(u8, 1) << @intCast(bit))) != 0;
         return on;
-
     }
 
     pub fn load_array(self: *Self, source: []const bool) void {

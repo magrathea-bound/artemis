@@ -14,17 +14,17 @@ pub fn FixedBuffer(comptime T: type) type {
 
         const Self = @This();
 
-        fn load(source: []const ?T, fb: *Self) void {
-            for (source, fb.length..) |src, i| {
+        fn load(self: *Self, source: []const ?T) void {
+            for (source, self.length..) |src, i| {
                 if (src) |val| {
-                    fb.values[i] = val;
+                    self.values[i] = val;
                 } else {
-                    fb.values[i] = 0;
-                    fb.null_bitmap.load_value(i);
-                    fb.nulls += 1;
+                    self.values[i] = 0;
+                    self.null_bitmap.load_value(i);
+                    self.nulls += 1;
                 }
             }
-            fb.length += source.len;
+            self.length += source.len;
         } 
 
         pub fn init(alloc: std.mem.Allocator, source: []const ?T) !Self {
@@ -42,7 +42,7 @@ pub fn FixedBuffer(comptime T: type) type {
 
             fb.null_bitmap = try u.Bitmap.init(alloc, source.len);
 
-            load(source, &fb);
+            fb.load(source);
 
             return fb;
         }

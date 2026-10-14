@@ -1,9 +1,10 @@
 //! Arrow Arrays
 const std = @import("std");
 const Io = std.Io;
-const utils = @import("utils.zig");
+const u = @import("utils.zig");
 
 const Binary = struct {
+    alloc: std.mem.Allocator,
     length: usize,
     nulls: usize,
     values: []u8,
@@ -11,49 +12,53 @@ const Binary = struct {
 
     const Self = @This();
 
-    fn load_offset(source: []const ?[]const u8, b: *Self) u32 {
-        var len: u32 = b.offset[b.length];
-        for (source, b.length..) |str, i| {
+    fn load_values(self: *Self, source: []const ?[]const u8) void {
+        for (source, self.length..) |str, i| {
             const s = str orelse {
-                b.nulls += 1;
-                b.offset[i+1] = b.offset[i];
+                self.length += 1;
+                self.nulls += 1;
+                self.offset[i+1] = self.offset[i];
                 continue;
-            };
-
-            len += @intCast(s.len);
-            b.offset[i+1] = len;
+        };
+            const start = self.offset[i];
+            const end = self.offset[i] + s.len;
+            self.offset[i+1] = @intCast(end);
+            @memcpy(self.values[start..end], s);
+            self.length += 1;
         }
-        return len;
-    }
 
-    fn load_values(source: []const ?[]const u8, b: *Self) void {
-        for (source, b.length..) |str, i| {
-            const s = str orelse continue;
-            const start: u32 = b.offset[i];
-            const end: u32 = b.offset[i+1];
-            @memcpy(b.values[start..end], s);
-        }
-        b.length = source.len;
+        self.length = source.len;
     }
 
     pub fn init(alloc: std.mem.Allocator, source: []const ?[]const u8) !Self {
         var b = Self{
+            .alloc = alloc,
             .length = 0,
             .nulls = 0,
             .values = undefined,
             .offset = undefined,
         };
-        const offset_cap = utils.calc_cap(2*(source.len+1));
-        b.offset = try alloc.alloc(u32, offset_cap/2);
+        const offset_cap = u.calc_cap(@sizeOf(u32) * (source.len+1));
+        b.offset = try alloc.alloc(u32, offset_cap / @sizeOf(u32));
         b.offset[0] = 0;
 
-        const offset_len = load_offset(source, &b);
+        var buffer_len: usize = 0;
+        for (source) |src| {
+            const s = src orelse continue;
+            buffer_len += s.len;
+        } 
 
-        const target_len: usize = utils.calc_cap(offset_len);
-        b.values = try alloc.alloc(u8, target_len);
-        load_values(source, &b);
+        const buf_cap = u.calc_cap(@sizeOf(u8) * buffer_len);
+        b.values = try alloc.alloc(u8, buf_cap / @sizeOf(u8));
+
+        b.load_values(source);
 
         return b;
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.alloc.free(self.values);
+        self.alloc.free(self.offset);
     }
 
 };
@@ -64,9 +69,8 @@ test "binary" {
     const alloc = gpa.allocator();
 
     const source: []const ?[]const u8 = &[_]?[]const u8{"Hello", "world", "testing", null, "dog", "cat"};
-    const array = try Binary.init(alloc, source);
-    defer alloc.free(array.values);
-    defer alloc.free(array.offset);
+    var array = try Binary.init(alloc, source);
+    defer array.deinit();
 
     try std.testing.expect(array.length == 6);
     try std.testing.expect(array.nulls == 1);

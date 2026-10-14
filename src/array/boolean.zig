@@ -10,23 +10,23 @@ const Bool = struct {
 
     const Self = @This();
 
-    fn load(source: []const ?bool, b: *Bool) void {
+    fn load(self: *Self, source: []const ?bool) void {
         for (source, 0..) |val, i| {
             if (val) |v| {
                 //Handle Value
                 switch (v) {
                     true => {
-                        b.values.load_value(i);
+                        self.values.load_value(i);
                     },
                     else => continue,
                 }
             //Handle Null
             } else {
-                b.null_bitmap.load_value(i);
-                b.nulls += 1;
+                self.null_bitmap.load_value(i);
+                self.nulls += 1;
             }
         }
-        b.length += source.len;
+        self.length += source.len;
     }
 
     pub fn init(alloc: std.mem.Allocator, source: []const ?bool) !Self {
@@ -41,7 +41,7 @@ const Bool = struct {
         b.values = try u.Bitmap.init(alloc, source.len);
         b.null_bitmap = try u.Bitmap.init(alloc, source.len);
 
-        load(source, &b);
+        b.load(source);
 
         return b;
         }
