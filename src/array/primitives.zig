@@ -6,11 +6,11 @@ const u = @import("utils.zig");
 ///Comptime function to define Fixed buffer types
 pub fn FixedBuffer(comptime T: type) type {
     return struct {
+        alloc: std.mem.Allocator,
         length: usize,
         nulls: usize, 
         values: []T,
         null_bitmap: u.Bitmap,
-        alloc: std.mem.Allocator,
 
         const Self = @This();
 
@@ -29,11 +29,11 @@ pub fn FixedBuffer(comptime T: type) type {
 
         pub fn init(alloc: std.mem.Allocator, source: []const ?T) !Self {
             var fb = Self {
+                .alloc = alloc,
                 .length = 0,
                 .nulls = 0,
                 .values = undefined,
                 .null_bitmap = undefined,
-                .alloc = alloc
             };
             const data_bytes = @sizeOf(T) * source.len;
             const target_cap = u.calc_cap(data_bytes);
